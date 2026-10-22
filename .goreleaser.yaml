@@ -41,18 +41,21 @@ changelog:
       - "^docs:"
       - "^chore:"
 
-homebrew_casks:
+# 继续发 Formula，现有的 brew install vangie/tap/zspace-cli 不用改。
+# brews 在 2.18 已标记弃用，但 homebrew_casks 会改成 cask，和现在的安装方式不一致。
+brews:
   - name: zspace-cli
-    binaries:
-      - zspace
-      - zspace-mcp
-    # 没有 tap token 时只在 dist 里生成配方，不推仓库。
-    skip_upload: '{{ not (isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN") }}'
     repository:
       owner: vangie
       name: homebrew-tap
-      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "missing" }}'
-    directory: Casks
+      git:
+        url: git@github.com:vangie/homebrew-tap.git
+        private_key: '{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}'
     homepage: https://github.com/vangie/zspace-cli
     description: 极空间 NAS 的命令行与 MCP 服务
+    install: |
+      bin.install "zspace"
+      bin.install "zspace-mcp"
+    test: |
+      system "#{bin}/zspace", "version"
 
