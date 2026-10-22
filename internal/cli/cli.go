@@ -71,6 +71,16 @@ func Run(args []string) int {
 	status := fs.String("status", "all", "")
 	kind := fs.String("type", "loading", "")
 	parentID := fs.String("parent-id", "0", "")
+	httpProxy := fs.String("http-proxy", "", "")
+	httpsProxy := fs.String("https-proxy", "", "")
+	proxyOff := fs.Bool("off", false, "")
+	proxyUser := fs.String("proxy-user", "", "")
+	proxyPassword := fs.String("proxy-password", "", "")
+	publish := fs.String("publish", "", "")
+	volume := fs.String("volume", "", "")
+	envFlag := fs.String("env", "", "")
+	network := fs.String("network", "", "")
+	restart := fs.String("restart", "", "")
 	rest, err := parseInterspersed(fs, args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -93,6 +103,10 @@ func Run(args []string) int {
 		ipv4Interface: *ipv4Interface, ipv6Interface: *ipv6Interface,
 		page: *page, limit: *limit, startAt: *startAt, pickType: *pickType,
 		mode: *mode, status: *status, kind: *kind, parentID: *parentID,
+		httpProxy: *httpProxy, httpsProxy: *httpsProxy, proxyOff: *proxyOff,
+		proxyUser: *proxyUser, proxyPassword: *proxyPassword,
+		publish: splitList(*publish), volumes: splitList(*volume), env: splitList(*envFlag),
+		network: *network, restart: *restart,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -128,6 +142,11 @@ type opts struct {
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
 	page, limit, startAt, pickType          int
+	httpProxy, httpsProxy               string
+	proxyOff                            bool
+	proxyUser, proxyPassword            string
+	publish, volumes, env               []string
+	network, restart                    string
 }
 
 func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int, error) {
@@ -447,7 +466,7 @@ func gateBeforeConnect(cmd string, args []string, o opts) error {
 			return confirm(o, "ddns "+args[0])
 		}
 	case "docker":
-		if len(args) > 0 && (args[0] == "pull" || args[0] == "create" || args[0] == "op" || args[0] == "rmi" || args[0] == "compose-create" || args[0] == "compose") {
+		if len(args) > 0 && (args[0] == "pull" || args[0] == "load" || args[0] == "create" || args[0] == "op" || args[0] == "rmi" || args[0] == "proxy-set" || args[0] == "compose-create" || args[0] == "compose") {
 			return confirm(o, "docker "+args[0])
 		}
 	case "recycle":
@@ -900,8 +919,18 @@ Docker（极空间私有 /zdocker 接口，不是 Docker Engine API）
   docker images
   docker networks
   docker projects
+  docker proxy                    引擎 HTTP/HTTPS 代理，不含密码
+  docker proxy-set --yes           --http-proxy 主机:端口
+                                  保存后等待引擎重启，并核对 HttpProxy
+                                  可再加 --https-proxy；--off 关闭
+                                  需要账号时加 --proxy-user --proxy-password
   docker pull <镜像>
+  docker load <NAS上的tar> --yes    对应网页的导入镜像
   docker create <镜像> <名字> --yes
+                                  --publish 宿主机:容器，可逗号分隔
+                                  --volume 宿主机路径:容器路径[:ro]
+                                  --env NAME=VALUE --network bridge
+                                  --restart no|always|unless-stopped|on-failure
   docker op <action> <容器ID> --yes
   docker rmi <镜像ID> --yes        --force 强制删除
   docker compose-create <名字> <yaml文件> <NAS目录> --yes

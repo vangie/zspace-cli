@@ -211,6 +211,17 @@ func str(args map[string]any, key string) string {
 	return v
 }
 
+func splitProxyArg(raw string) (string, string, error) {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimPrefix(raw, "http://")
+	raw = strings.TrimPrefix(raw, "https://")
+	host, port, ok := strings.Cut(raw, ":")
+	if !ok || host == "" || port == "" || strings.Contains(port, ":") {
+		return "", "", fmt.Errorf("代理 %q 需要 主机:端口", raw)
+	}
+	return host, port, nil
+}
+
 func splitComma(s string) []string {
 	if strings.TrimSpace(s) == "" {
 		return nil
@@ -299,6 +310,10 @@ func toolsFor(write, allowDelete bool) []tool {
 					return nil, err
 				}
 				return map[string]any{"versions": info, "status": status}, nil
+			}},
+		{"docker_proxy", "Docker 引擎代理，不含密码", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
+				return c.ProxyConfig(ctx)
 			}},
 		{"photo_status", "相册 AI 开关和索引进度", "read", schema(nil, map[string]any{}),
 			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.PhotoStatus(ctx) }},
@@ -516,6 +531,88 @@ func toolsFor(write, allowDelete bool) []tool {
 					return nil, err
 				}
 				return map[string]any{"ok": true}, nil
+			}},
+		{"docker_proxy_set", "修改 Docker 引擎 HTTP/HTTPS 代理", "write",
+			schema([]string{"http_proxy"}, map[string]any{
+				"http_proxy":  textProp("主机:端口，例如 192.168.0.173:6152"),
+				"https_proxy": textProp("可选，缺省与 http_proxy 相同"),
+				"off":         map[string]any{"type": "boolean", "description": "关闭代理"},
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				if off, _ := a["off"].(bool); off {
+					cfg := api.ProxyConfig{Status: "0"}
+					if err := c.SaveProxyConfig(ctx, cfg); err != nil {
+						return nil, err
+					}
+					waitCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+					defer cancel()
+					if _, err := c.WaitDockerReady(waitCtx, "", ""); err != nil {
+						return nil, err
+					}
+					return c.ProxyConfig(ctx)
+				}
+				httpURL, httpPort, err := splitProxyArg(str(a, "http_proxy"))
+				if err != nil {
+					return nil, err
+				}
+				https := str(a, "https_proxy")
+				if https == "" {
+					https = str(a, "http_proxy")
+				}
+				httpsURL, httpsPort, err := splitProxyArg(https)
+				if err != nil {
+					return nil, err
+				}
+				cfg := api.ProxyConfig{
+					Status: "1",
+					HTTP:   api.ProxyEndpoint{URL: httpURL, Port: httpPort},
+					HTTPS:  api.ProxyEndpoint{URL: httpsURL, Port: httpsPort},
+				}
+				if err := c.SaveProxyConfig(ctx, cfg); err != nil {
+					return nil, err
+				}
+				waitCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+				defer cancel()
+				info, err := c.WaitDockerReady(waitCtx, api.ProxyURL(cfg.HTTP), api.ProxyURL(cfg.HTTPS))
+				if err != nil {
+					return nil, err
+				}
+				got, err := c.ProxyConfig(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return map[string]any{"proxy": got, "http_proxy": info["HttpProxy"], "https_proxy": info["HttpsProxy"], "restart": "done"}, nil
+			}},
+		{"docker_create", "创建容器，可带端口、挂载和环境变量", "write",
+			schema([]string{"image", "name"}, map[string]any{
+				"image":   textProp("镜像引用"),
+				"name":    textProp("容器名"),
+				"publish": textProp("宿主机:容器，多个用逗号分隔"),
+				"volume":  textProp("宿主机路径:容器路径[:ro]，多个用逗号分隔"),
+				"env":     textProp("NAME=VALUE，多个用逗号分隔"),
+				"network": textProp("网络名，默认 bridge"),
+				"restart": textProp("no、always、unless-stopped、on-failure"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				body := map[string]any{}
+				if err := api.ApplyContainerSpec(body, api.ContainerSpec{
+					Publish: splitComma(str(a, "publish")),
+					Volumes: splitComma(str(a, "volume")),
+					Env:     splitComma(str(a, "env")),
+					Network: str(a, "network"),
+					Restart: str(a, "restart"),
+				}); err != nil {
+					return nil, err
+				}
+				return c.CreateContainer(ctx, str(a, "name"), str(a, "image"), body)
+			}},
+		{"docker_load", "从 NAS 上的 tar 导入镜像", "write",
+			schema([]string{"path"}, map[string]any{"path": textProp("NAS 文件路径，例如 /sata1/my/data/image.tar")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				if err := c.ImportImage(ctx, str(a, "path")); err != nil {
+					return nil, err
+				}
+				return map[string]any{"imported": true}, nil
 			}},
 		{"docker_op", "对容器执行 start/stop/restart/pause/resume", "write",
 			schema([]string{"container_id", "action"}, map[string]any{

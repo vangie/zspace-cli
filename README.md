@@ -59,7 +59,8 @@ Linux 依次查找 `~/.zspace`、`~/.config/zspace`、`~/zspace`。
 | `music status\|songs\|albums\|artists\|playlists\|latest\|history\|favorites\|picks\|search\|lyrics` | 极音乐曲库、歌单、最近播放、歌词 |
 | `ddns list\|add\|update\|rm\|refresh` | DDNS 配置。一行是一个服务商加它的主机记录，密钥不输出 |
 | `docker info\|ps\|images\|networks\|projects` | Docker 只读 |
-| `docker pull\|create\|op\|rmi` | 拉镜像、建容器、启停、删镜像 |
+| `docker proxy\|proxy-set` | 查看和修改引擎 HTTP/HTTPS 代理。保存后极空间会重启 Docker，命令等到引擎恢复并核对 `HttpProxy` |
+| `docker pull\|load\|create\|op\|rmi` | 拉镜像、从 NAS 上的 tar 导入、建容器、启停、删镜像。`create` 支持 `--publish`、`--volume`、`--env`、`--network`、`--restart` |
 | `docker compose-create` `docker compose` | Compose 项目创建与 start/stop/restart/delete/rebuild |
 
 `zspace help` 有每个命令的参数。
@@ -71,7 +72,10 @@ NAS 上的 Docker 走极空间自己的 `/zdocker` 接口，不是 Docker Engine
 ```bash
 zspace docker ps
 zspace docker pull hello-world --yes
-zspace docker create hello-world demo --yes
+zspace docker proxy
+zspace docker proxy-set --http-proxy 192.168.0.173:6152 --yes
+zspace docker create hello-world demo --yes --publish 8787:8787 --volume /tmp/zfsv3/sata1/18501646420/data/docker_vol/ipad-frame:/data
+zspace docker load /sata1/my/data/image.tar --yes
 zspace docker op start <容器ID> --yes
 zspace docker op remove <容器ID> --yes
 ```
