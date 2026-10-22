@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+# 同一标签只跑一个发布。旧任务被取消时不会删掉已经创建的 Release。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
