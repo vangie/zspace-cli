@@ -41,11 +41,16 @@ func Run(args []string) int {
 	baseURL := fs.String("base-url", "", "")
 	hidden := fs.Bool("hidden", false, "")
 	public := fs.Bool("public", false, "")
+	liked := fs.Bool("liked", false, "")
+	unlike := fs.Bool("unlike", false, "")
 	force := fs.Bool("force", false, "")
 	start := fs.Bool("start", true, "")
 	page := fs.Int("page", 1, "")
 	limit := fs.Int("limit", 50, "")
+	startAt := fs.Int("offset", 0, "")
+	pickType := fs.Int("type-id", 0, "")
 	mode := fs.String("mode", "ai", "")
+	thumbSize := fs.String("size", "small", "")
 	status := fs.String("status", "all", "")
 	kind := fs.String("type", "loading", "")
 	parentID := fs.String("parent-id", "0", "")
@@ -61,8 +66,9 @@ func Run(args []string) int {
 	out, code, err := dispatch(ctx, cmd, rest, opts{
 		json: *jsonOut, yes: *yes, configDir: *configDir, baseURL: *baseURL,
 		hidden: *hidden, public: *public, force: *force, start: *start,
-		page: *page, limit: *limit, mode: *mode, status: *status, kind: *kind,
-		parentID: *parentID,
+		liked: *liked, unlike: *unlike, thumbSize: *thumbSize,
+		page: *page, limit: *limit, startAt: *startAt, pickType: *pickType,
+		mode: *mode, status: *status, kind: *kind, parentID: *parentID,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -86,9 +92,11 @@ func Run(args []string) int {
 
 type opts struct {
 	json, yes, hidden, public, force, start bool
+	liked, unlike                           bool
+	thumbSize                               string
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
-	page, limit                             int
+	page, limit, startAt, pickType          int
 }
 
 func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int, error) {
@@ -466,14 +474,90 @@ func cmdPhoto(ctx context.Context, c *api.Client, args []string, o opts) (any, i
 		sub = args[0]
 		args = args[1:]
 	}
+	num := o.limit
+	if num <= 0 {
+		num = 50
+	}
 	switch sub {
 	case "status":
 		return call(c.PhotoStatus(ctx))
+	case "home":
+		return call(c.AlbumHome(ctx))
+	case "albums":
+		return call(c.Albums(ctx, o.startAt, num))
+	case "info":
+		if len(args) < 1 {
+			return nil, 2, errors.New("用法：zspace photo info <相册ID>")
+		}
+		return call(c.AlbumInfo(ctx, args[0]))
+	case "feeds":
+		if len(args) < 1 {
+			return nil, 2, errors.New("用法：zspace photo feeds <相册ID>")
+		}
+		return call(c.AlbumFeeds(ctx, args[0], o.startAt, num))
+	case "timeline":
+		return call(c.PhotoTimeline(ctx))
+	case "list":
+		return call(c.Photos(ctx, o.startAt, num, o.liked))
+	case "dirs":
+		return call(c.AlbumDirs(ctx))
+	case "picks":
+		return call(c.PhotoPickTypes(ctx))
+	case "pick":
+		if o.pickType == 0 && len(args) > 0 {
+			fmt.Sscanf(args[0], "%d", &o.pickType)
+		}
+		if o.pickType == 0 {
+			return nil, 2, errors.New("用法：zspace photo pick <分类ID>")
+		}
+		return call(c.PhotoPicks(ctx, o.pickType, o.startAt, num, ""))
+	case "like":
+		if len(args) < 1 {
+			return nil, 2, errors.New("用法：zspace photo like <照片ID> --yes")
+		}
+		if err := confirm(o, "修改照片喜欢状态"); err != nil {
+			return nil, 2, err
+		}
+		if err := c.PhotoLike(ctx, args[0], !o.unlike); err != nil {
+			return nil, 1, err
+		}
+		return map[string]any{"feed_id": args[0], "liked": !o.unlike}, 0, nil
 	case "search":
 		if len(args) < 1 {
 			return nil, 2, errors.New("用法：zspace photo search <文字或图片路径> --mode ai|ocr|similar")
 		}
-		return call(c.PhotoSearch(ctx, o.mode, args[0], o.limit))
+		return call(c.PhotoSearch(ctx, o.mode, args[0], num))
+	case "thumb":
+		if len(args) < 2 {
+			return nil, 2, errors.New("用法：zspace photo thumb <NAS路径> <本地文件> --size small|large")
+		}
+		if err := c.PhotoThumb(ctx, args[0], args[1], o.thumbSize); err != nil {
+			return nil, 1, err
+		}
+		return map[string]string{"path": args[1]}, 0, nil
+	case "create":
+		if len(args) < 1 {
+			return nil, 2, errors.New("用法：zspace photo create <名字> --yes")
+		}
+		if err := confirm(o, "新建相册 "+args[0]); err != nil {
+			return nil, 2, err
+		}
+		desc := ""
+		if len(args) > 1 {
+			desc = args[1]
+		}
+		return call(c.CreateAlbum(ctx, args[0], desc))
+	case "delete":
+		if len(args) < 1 {
+			return nil, 2, errors.New("用法：zspace photo delete <相册ID> --yes")
+		}
+		if err := confirm(o, "删除相册 "+args[0]); err != nil {
+			return nil, 2, err
+		}
+		if err := c.DeleteAlbum(ctx, args[0]); err != nil {
+			return nil, 1, err
+		}
+		return map[string]any{"album_id": args[0], "deleted": true}, 0, nil
 	default:
 		return nil, 2, fmt.Errorf("未知子命令 photo %s", sub)
 	}
@@ -560,8 +644,21 @@ const usage = `zspace — 极空间 NAS 命令行
   cloud tasks <baidu|quark>
   download list                    --type loading|complete --status all
   download add <链接> <目录> --yes
-  photo status
+  photo status                     相册开关和 AI 索引进度
+  photo home                       相册首页分组
+  photo albums                     相册列表（--offset --limit）
+  photo info <相册ID>
+  photo feeds <相册ID>             相册内的照片
+  photo timeline                   时间线分组
+  photo list                       全部照片（--liked 只看喜欢的）
+  photo dirs                       相册扫描目录
+  photo picks                      AI 挑选分类
+  photo pick <分类ID>              一个分类下的结果
+  photo like <照片ID> --yes        标记喜欢（--unlike 取消）
   photo search <文字或路径>        --mode ai|ocr|similar --limit
+  photo thumb <NAS路径> <本地文件> 保存缩略图（--size small|large）
+  photo create <名字> --yes        新建相册
+  photo delete <相册ID> --yes      删除相册
 
 Docker（极空间私有 /zdocker 接口，不是 Docker Engine API）
   docker info

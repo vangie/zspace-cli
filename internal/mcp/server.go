@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -190,6 +191,21 @@ func writeMessage(resp response) {
 	fmt.Printf("Content-Length: %d\r\n\r\n%s", len(buf), buf)
 }
 
+func numArg(args map[string]any, key string, def int) int {
+	switch v := args[key].(type) {
+	case float64:
+		return int(v)
+	case string:
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return def
+		}
+		return n
+	default:
+		return def
+	}
+}
+
 func str(args map[string]any, key string) string {
 	v, _ := args[key].(string)
 	return v
@@ -257,6 +273,20 @@ func toolsFor(write, allowDelete bool) []tool {
 			}},
 		{"photo_status", "相册 AI 开关和索引进度", "read", schema(nil, map[string]any{}),
 			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.PhotoStatus(ctx) }},
+		{"photo_home", "相册首页：我的相册、系统目录、喜欢", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.AlbumHome(ctx) }},
+		{"photo_albums", "相册列表", "read",
+			schema(nil, map[string]any{"start": map[string]any{"type": "number"}, "num": map[string]any{"type": "number"}}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.Albums(ctx, numArg(a, "start", 0), numArg(a, "num", 50))
+			}},
+		{"photo_list", "全部照片和视频", "read",
+			schema(nil, map[string]any{"start": map[string]any{"type": "number"}, "num": map[string]any{"type": "number"}}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.Photos(ctx, numArg(a, "start", 0), numArg(a, "num", 50), false)
+			}},
+		{"photo_timeline", "照片时间线分组", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.PhotoTimeline(ctx) }},
 		{"cloud_status", "网盘登录状态", "read",
 			schema([]string{"provider"}, map[string]any{"provider": textProp("baidu 或 quark")}),
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {

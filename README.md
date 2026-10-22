@@ -50,7 +50,10 @@ Linux 依次查找 `~/.zspace`、`~/.config/zspace`、`~/zspace`。
 | `recycle list\|empty\|restore\|config` | 回收站。`empty --public` 清公共回收站 |
 | `cloud status\|ls\|tasks <baidu\|quark>` | 百度网盘、夸克网盘 |
 | `download list\|add` | NAS 下载器 |
-| `photo status\|search` | 相册 AI 状态、内容搜索（`--mode ai\|ocr\|similar`） |
+| `photo status\|home\|albums\|info\|feeds\|timeline\|list\|dirs` | 相册首页、列表、详情、照片流、时间线、扫描目录 |
+| `photo picks\|pick` | AI 挑选分类和结果 |
+| `photo search` | 内容搜索（`--mode ai\|ocr\|similar`） |
+| `photo like\|thumb\|create\|delete` | 喜欢、缩略图、新建和删除相册。写操作要 `--yes` |
 | `docker info\|ps\|images\|networks\|projects` | Docker 只读 |
 | `docker pull\|create\|op\|rmi` | 拉镜像、建容器、启停、删镜像 |
 | `docker compose-create` `docker compose` | Compose 项目创建与 start/stop/restart/delete/rebuild |
