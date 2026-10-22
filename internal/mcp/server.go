@@ -211,6 +211,21 @@ func str(args map[string]any, key string) string {
 	return v
 }
 
+func splitComma(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
+
 func intPtr(args map[string]any, key string) *int {
 	v, ok := args[key]
 	if !ok || v == nil {
@@ -344,6 +359,8 @@ func toolsFor(write, allowDelete bool) []tool {
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
 				return c.MusicSearch(ctx, str(a, "keyword"), 30)
 			}},
+		{"ddns_list", "DDNS 配置列表，不含密钥", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.DDNSList(ctx) }},
 		{"music_history", "最近播放", "read", schema(nil, map[string]any{}),
 			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
 				return c.MusicHistory(ctx, 1, 30)
@@ -473,6 +490,32 @@ func toolsFor(write, allowDelete bool) []tool {
 					return nil, errors.New("需要 file_ids 或 folder_ids")
 				}
 				return c.CloudDownload(ctx, api.CloudProvider(str(a, "provider")), str(a, "save_path"), str(a, "file_ids"), str(a, "folder_ids"))
+			}},
+		{"ddns_add", "新增一行 DDNS。同一服务商由页面按一行处理", "write",
+			schema([]string{"provider", "access_key"}, map[string]any{
+				"provider":   textProp("tencent、aliyun、cloudflare 或 duckdns"),
+				"record4":    textProp("IPv4 主机记录，逗号分隔"),
+				"record6":    textProp("IPv6 主机记录，逗号分隔"),
+				"access_id":  textProp("除 duckdns 外必填"),
+				"access_key": textProp("密钥或 token"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				rec := api.DDNSRecord{
+					Provider: str(a, "provider"), Record4: splitComma(str(a, "record4")), Record6: splitComma(str(a, "record6")),
+					AccessID: str(a, "access_id"), AccessKey: str(a, "access_key"), IPv4Enable: true,
+				}
+				if err := c.DDNSCreate(ctx, rec); err != nil {
+					return nil, err
+				}
+				return map[string]any{"ok": true}, nil
+			}},
+		{"ddns_rm", "按服务商删除整行 DDNS", "delete",
+			schema([]string{"provider"}, map[string]any{"provider": textProp("tencent、aliyun、cloudflare 或 duckdns")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				if err := c.DDNSDelete(ctx, str(a, "provider")); err != nil {
+					return nil, err
+				}
+				return map[string]any{"ok": true}, nil
 			}},
 		{"docker_op", "对容器执行 start/stop/restart/pause/resume", "write",
 			schema([]string{"container_id", "action"}, map[string]any{

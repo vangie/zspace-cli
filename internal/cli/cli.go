@@ -57,6 +57,17 @@ func Run(args []string) int {
 	folderIDs := fs.String("folder-ids", "", "")
 	taskID := fs.String("task", "", "")
 	classID := fs.String("class", "", "")
+	provider := fs.String("provider", "", "")
+	record4 := fs.String("record4", "", "")
+	record6 := fs.String("record6", "", "")
+	accessID := fs.String("access-id", "", "")
+	accessKey := fs.String("access-key", "", "")
+	ipv4 := fs.Bool("ipv4", true, "")
+	ipv6 := fs.Bool("ipv6", false, "")
+	ipv4Method := fs.String("ipv4-method", "", "")
+	ipv6Method := fs.String("ipv6-method", "", "")
+	ipv4Interface := fs.String("ipv4-interface", "", "")
+	ipv6Interface := fs.String("ipv6-interface", "", "")
 	status := fs.String("status", "all", "")
 	kind := fs.String("type", "loading", "")
 	parentID := fs.String("parent-id", "0", "")
@@ -75,6 +86,11 @@ func Run(args []string) int {
 		liked: *liked, unlike: *unlike, thumbSize: *thumbSize,
 		myDays: *myDays, publicDays: *publicDays,
 		fileIDs: *fileIDs, folderIDs: *folderIDs, taskID: *taskID, classID: *classID,
+		provider: *provider, record4: *record4, record6: *record6,
+		accessID: *accessID, accessKey: *accessKey,
+		ipv4: *ipv4, ipv6: *ipv6,
+		ipv4Method: *ipv4Method, ipv6Method: *ipv6Method,
+		ipv4Interface: *ipv4Interface, ipv6Interface: *ipv6Interface,
 		page: *page, limit: *limit, startAt: *startAt, pickType: *pickType,
 		mode: *mode, status: *status, kind: *kind, parentID: *parentID,
 	})
@@ -104,6 +120,11 @@ type opts struct {
 	thumbSize                               string
 	myDays, publicDays                      int
 	fileIDs, folderIDs, taskID, classID     string
+	provider, record4, record6              string
+	accessID, accessKey                     string
+	ipv4Method, ipv6Method                  string
+	ipv4Interface, ipv6Interface            string
+	ipv4, ipv6                              bool
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
 	page, limit, startAt, pickType          int
@@ -279,6 +300,8 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 		return cmdVideo(ctx, c, args, o)
 	case "music":
 		return cmdMusic(ctx, c, args, o)
+	case "ddns":
+		return cmdDDNS(ctx, c, args, o)
 	case "docker":
 		return cmdDocker(ctx, c, args, o)
 	default:
@@ -798,6 +821,18 @@ const usage = `zspace — 极空间 NAS 命令行
   music info <歌曲ID>
   music lyrics <歌曲ID>
   music search <歌名>
+
+DDNS
+  ddns list
+  ddns add --provider <tencent|aliyun|cloudflare|duckdns> --yes
+                                  --record4 主机名，逗号分隔，可再加 --record6
+                                  --access-id --access-key
+                                  IP 检测默认极空间云端；网卡用
+                                  --ipv4-method interface --ipv4-interface <网卡>
+  ddns update --provider <服务商> --yes
+                                  只覆盖给出的主机记录和密钥，其余保持原值
+  ddns rm --provider <服务商> --yes
+  ddns refresh --yes              按当前公网 IP 更新全部记录
 
 Docker（极空间私有 /zdocker 接口，不是 Docker Engine API）
   docker info

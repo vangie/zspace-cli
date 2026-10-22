@@ -34,7 +34,7 @@ func TestWriteRequiresYes(t *testing.T) {
 }
 
 func TestUsageMentionsDocker(t *testing.T) {
-	if !strings.Contains(usage, "docker ps") || !strings.Contains(usage, "photo albums") || !strings.Contains(usage, "video classes") || !strings.Contains(usage, "music songs") {
+	if !strings.Contains(usage, "docker ps") || !strings.Contains(usage, "photo albums") || !strings.Contains(usage, "video classes") || !strings.Contains(usage, "music songs") || !strings.Contains(usage, "ddns add") {
 		t.Fatal("帮助文本缺命令")
 	}
 }
