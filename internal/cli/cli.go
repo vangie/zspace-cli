@@ -140,6 +140,13 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 	switch cmd {
 	case "check":
 		return cmdCheck(ctx, o)
+	default:
+		if !knownCommand(cmd) {
+			return nil, 2, fmt.Errorf("未知命令 %s，运行 zspace help 查看用法", cmd)
+		}
+	}
+	if err := gateBeforeConnect(cmd, args, o); err != nil {
+		return nil, 2, err
 	}
 
 	c, err := connect(o)
@@ -404,6 +411,59 @@ func cmdCheck(ctx context.Context, o opts) (any, int, error) {
 		result["pools_error"] = perr.Error()
 	}
 	return result, 0, nil
+}
+
+func knownCommand(cmd string) bool {
+	switch cmd {
+	case "ls", "info", "glob", "find", "rename", "mkdir", "mv", "cp", "rm",
+		"up", "down", "tree", "pools", "disks", "usage", "hardware", "smart",
+		"recycle", "cloud", "download", "photo", "video", "music", "ddns", "docker":
+		return true
+	default:
+		return false
+	}
+}
+
+// gateBeforeConnect 处理不需要连接 NAS 就能判定的用法错误。
+// CI 上没有登录文件，这些错误必须在 connect 之前返回。
+func gateBeforeConnect(cmd string, args []string, o opts) error {
+	switch cmd {
+	case "rename", "mkdir", "mv", "cp", "up":
+		if len(args) < 2 {
+			return nil
+		}
+		return confirm(o, cmd)
+	case "rm":
+		if len(args) < 1 {
+			return nil
+		}
+		return confirm(o, cmd)
+	case "photo":
+		if len(args) > 0 && (args[0] == "create" || args[0] == "delete" || args[0] == "like") {
+			return confirm(o, "photo "+args[0])
+		}
+	case "ddns":
+		if len(args) > 0 && (args[0] == "add" || args[0] == "update" || args[0] == "rm" || args[0] == "refresh") {
+			return confirm(o, "ddns "+args[0])
+		}
+	case "docker":
+		if len(args) > 0 && (args[0] == "pull" || args[0] == "create" || args[0] == "op" || args[0] == "rmi" || args[0] == "compose-create" || args[0] == "compose") {
+			return confirm(o, "docker "+args[0])
+		}
+	case "recycle":
+		if len(args) > 0 && (args[0] == "empty" || args[0] == "restore" || args[0] == "config-set") {
+			return confirm(o, "recycle "+args[0])
+		}
+	case "cloud":
+		if len(args) > 0 && (args[0] == "task" || args[0] == "down") {
+			return confirm(o, "cloud "+args[0])
+		}
+	case "download":
+		if len(args) > 0 && args[0] == "add" {
+			return confirm(o, "download add")
+		}
+	}
+	return nil
 }
 
 func confirm(o opts, what string) error {
