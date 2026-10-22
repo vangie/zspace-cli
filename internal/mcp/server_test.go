@@ -40,6 +40,9 @@ func TestInitializeAndToolGating(t *testing.T) {
 	if !strings.Contains(string(buf), "zspace_glob") || !strings.Contains(string(buf), "zspace_cloud_fails") || !strings.Contains(string(buf), "zspace_recycle_config") {
 		t.Fatalf("读工具缺少新增项：%s", buf)
 	}
+	if !strings.Contains(string(buf), "zspace_video_list") || !strings.Contains(string(buf), "zspace_music_songs") {
+		t.Fatalf("读工具缺少影视和音乐：%s", buf)
+	}
 	if strings.Contains(string(buf), "zspace_cloud_down") || strings.Contains(string(buf), "zspace_recycle_config_set") {
 		t.Fatalf("默认不应暴露写工具：%s", buf)
 	}

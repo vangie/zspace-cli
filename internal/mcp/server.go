@@ -301,6 +301,53 @@ func toolsFor(write, allowDelete bool) []tool {
 			}},
 		{"photo_timeline", "照片时间线分组", "read", schema(nil, map[string]any{}),
 			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.PhotoTimeline(ctx) }},
+		{"video_status", "极影视服务状态", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.VideoStatus(ctx) }},
+		{"video_classes", "极影视片库分类", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
+				return c.VideoClassifications(ctx)
+			}},
+		{"video_list", "列出一个分类下的影视。不给分类时返回最近添加", "read",
+			schema(nil, map[string]any{
+				"classification_id": textProp("分类 ID，可空"),
+				"start":             map[string]any{"type": "number"},
+				"limit":             map[string]any{"type": "number"},
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.VideoList(ctx, str(a, "classification_id"), numArg(a, "start", 1), numArg(a, "limit", 30))
+			}},
+		{"video_search", "在本地片库搜索", "read",
+			schema([]string{"keyword"}, map[string]any{
+				"keyword":           textProp("关键词"),
+				"classification_id": textProp("可选，限定分类"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.VideoSearch(ctx, str(a, "keyword"), str(a, "classification_id"))
+			}},
+		{"video_records", "极影视播放记录", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
+				return c.VideoRecords(ctx, 1, 30)
+			}},
+		{"music_status", "极音乐服务状态", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.MusicStatus(ctx) }},
+		{"music_songs", "歌曲列表", "read",
+			schema(nil, map[string]any{"start": map[string]any{"type": "number"}, "limit": map[string]any{"type": "number"}}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.MusicSongs(ctx, numArg(a, "start", 1), numArg(a, "limit", 30))
+			}},
+		{"music_albums", "专辑列表", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
+				return c.MusicAlbums(ctx, 1, 30)
+			}},
+		{"music_search", "按歌名搜索", "read",
+			schema([]string{"keyword"}, map[string]any{"keyword": textProp("歌名")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.MusicSearch(ctx, str(a, "keyword"), 30)
+			}},
+		{"music_history", "最近播放", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) {
+				return c.MusicHistory(ctx, 1, 30)
+			}},
 		{"cloud_status", "网盘登录状态", "read",
 			schema([]string{"provider"}, map[string]any{"provider": textProp("baidu 或 quark")}),
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {

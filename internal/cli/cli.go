@@ -56,6 +56,7 @@ func Run(args []string) int {
 	fileIDs := fs.String("file-ids", "", "")
 	folderIDs := fs.String("folder-ids", "", "")
 	taskID := fs.String("task", "", "")
+	classID := fs.String("class", "", "")
 	status := fs.String("status", "all", "")
 	kind := fs.String("type", "loading", "")
 	parentID := fs.String("parent-id", "0", "")
@@ -73,7 +74,7 @@ func Run(args []string) int {
 		hidden: *hidden, public: *public, force: *force, start: *start,
 		liked: *liked, unlike: *unlike, thumbSize: *thumbSize,
 		myDays: *myDays, publicDays: *publicDays,
-		fileIDs: *fileIDs, folderIDs: *folderIDs, taskID: *taskID,
+		fileIDs: *fileIDs, folderIDs: *folderIDs, taskID: *taskID, classID: *classID,
 		page: *page, limit: *limit, startAt: *startAt, pickType: *pickType,
 		mode: *mode, status: *status, kind: *kind, parentID: *parentID,
 	})
@@ -102,7 +103,7 @@ type opts struct {
 	liked, unlike                           bool
 	thumbSize                               string
 	myDays, publicDays                      int
-	fileIDs, folderIDs, taskID              string
+	fileIDs, folderIDs, taskID, classID     string
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
 	page, limit, startAt, pickType          int
@@ -274,6 +275,10 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 		return cmdDownload(ctx, c, args, o)
 	case "photo":
 		return cmdPhoto(ctx, c, args, o)
+	case "video":
+		return cmdVideo(ctx, c, args, o)
+	case "music":
+		return cmdMusic(ctx, c, args, o)
 	case "docker":
 		return cmdDocker(ctx, c, args, o)
 	default:
@@ -777,6 +782,22 @@ const usage = `zspace — 极空间 NAS 命令行
   photo thumb <NAS路径> <本地文件> 保存缩略图（--size small|large）
   photo create <名字> --yes        新建相册
   photo delete <相册ID> --yes      删除相册
+  video status                     极影视服务状态
+  video classes                    片库分类
+  video home                       最近添加和推荐
+  video list [分类ID]              分类下的影视（--offset --limit，分页从 1 开始）
+  video info <影视ID>
+  video search <关键词>            --class 限定分类
+  video records                    播放记录
+  video favorites                  收藏
+  video series <分类ID>            合集
+  music status                     极音乐服务状态
+  music songs|albums|artists       歌曲、专辑、歌手（--offset --limit）
+  music playlists                  歌单
+  music latest|history|favorites|picks
+  music info <歌曲ID>
+  music lyrics <歌曲ID>
+  music search <歌名>
 
 Docker（极空间私有 /zdocker 接口，不是 Docker Engine API）
   docker info

@@ -55,6 +55,8 @@ Linux 依次查找 `~/.zspace`、`~/.config/zspace`、`~/zspace`。
 | `photo picks\|pick` | AI 挑选分类和结果 |
 | `photo search` | 内容搜索（`--mode ai\|ocr\|similar`） |
 | `photo like\|thumb\|create\|delete` | 喜欢、缩略图、新建和删除相册。写操作要 `--yes` |
+| `video status\|classes\|home\|list\|info\|search\|records\|favorites\|series` | 极影视片库、搜索、播放记录、收藏 |
+| `music status\|songs\|albums\|artists\|playlists\|latest\|history\|favorites\|picks\|search\|lyrics` | 极音乐曲库、歌单、最近播放、歌词 |
 | `docker info\|ps\|images\|networks\|projects` | Docker 只读 |
 | `docker pull\|create\|op\|rmi` | 拉镜像、建容器、启停、删镜像 |
 | `docker compose-create` `docker compose` | Compose 项目创建与 start/stop/restart/delete/rebuild |
@@ -90,7 +92,7 @@ zspace docker op remove <容器ID> --yes
 }
 ```
 
-工具名以 `zspace_` 开头，例如 `zspace_ls`、`zspace_glob`、`zspace_docker_ps`、`zspace_cloud_ls`、`zspace_photo_home`。`--write` 另外打开回收站天数、网盘任务和网盘下载。
+工具名以 `zspace_` 开头，例如 `zspace_ls`、`zspace_glob`、`zspace_docker_ps`、`zspace_video_list`、`zspace_music_songs`。`--write` 另外打开回收站天数、网盘任务和网盘下载。
 
 ## 接口从哪里来
 

@@ -182,11 +182,17 @@ func (c *Client) Form(ctx context.Context, endpoint string, extra map[string]str
 	return c.do(req)
 }
 
-// Get 发送 GET。query 会与 rnd、webagent 合并。
+// Get 发送 GET。query 会与登录字段、rnd、webagent 合并。
 func (c *Client) Get(ctx context.Context, endpoint string, query map[string]string) (Envelope, error) {
 	vals := url.Values{}
 	vals.Set("rnd", rnd())
 	vals.Set("webagent", "v2")
+	vals.Set("token", c.Creds.Token)
+	vals.Set("nasid", c.Creds.NasID)
+	vals.Set("plat", "web")
+	vals.Set("version", apiVersion)
+	vals.Set("device_id", c.Creds.DeviceID)
+	vals.Set("_l", "zh_cn")
 	for k, v := range query {
 		if v != "" {
 			vals.Set(k, v)
