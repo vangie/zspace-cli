@@ -24,7 +24,7 @@ builds:
 
 archives:
   - id: default
-    builds: [zspace, zspace-mcp]
+    ids: [zspace, zspace-mcp]
     name_template: "zspace_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
@@ -41,18 +41,18 @@ changelog:
       - "^docs:"
       - "^chore:"
 
-brews:
+homebrew_casks:
   - name: zspace-cli
-    skip: "{{ eq .Env.HOMEBREW_TAP_GITHUB_TOKEN \"\" }}"
+    binaries:
+      - zspace
+      - zspace-mcp
+    # 没有 tap token 时只在 dist 里生成配方，不推仓库。
+    skip_upload: '{{ not (isEnvSet "HOMEBREW_TAP_GITHUB_TOKEN") }}'
     repository:
       owner: vangie
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
+      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "missing" }}'
+    directory: Casks
     homepage: https://github.com/vangie/zspace-cli
     description: 极空间 NAS 的命令行与 MCP 服务
-    install: |
-      bin.install "zspace"
-      bin.install "zspace-mcp"
-    test: |
-      system "#{bin}/zspace version"
+
