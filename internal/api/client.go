@@ -535,7 +535,7 @@ func (c *Client) CloudStatus(ctx context.Context, p CloudProvider) (map[string]a
 	return data, nil
 }
 
-// CloudList 列出网盘目录。夸克用 parentID 翻页，百度用 path 和页码。
+// CloudList 列出网盘目录。夸克用 parent_file_id，百度用 path 和页码。
 func (c *Client) CloudList(ctx context.Context, p CloudProvider, dir, parentID string, page, limit int) (json.RawMessage, error) {
 	base, err := p.base()
 	if err != nil {
@@ -547,6 +547,9 @@ func (c *Client) CloudList(ctx context.Context, p CloudProvider, dir, parentID s
 	if page <= 0 {
 		page = 1
 	}
+	if parentID == "" {
+		parentID = "0"
+	}
 	var endpoint string
 	extra := map[string]string{}
 	switch p {
@@ -557,9 +560,10 @@ func (c *Client) CloudList(ctx context.Context, p CloudProvider, dir, parentID s
 		extra["limit"] = strconv.Itoa(limit)
 	default:
 		endpoint = base + "/file/filelist"
-		extra["parent_id"] = parentID
-		extra["page"] = strconv.Itoa(page)
+		extra["parent_file_id"] = parentID
+		extra["show_dir"] = "1"
 		extra["limit"] = strconv.Itoa(limit)
+		extra["sort"] = ""
 	}
 	env, err := c.Form(ctx, endpoint, extra, nil)
 	if err != nil {
@@ -655,7 +659,7 @@ func (c *Client) PhotoSearch(ctx context.Context, mode, query string, limit int)
 	}
 	deadline := time.Now().Add(30 * time.Second)
 	for {
-		env, err := c.Form(ctx, "/v2/album/feed/search/query", map[string]string{"start": "0", "num": strconv.Itoa(limit)}, nil)
+		env, err := c.Form(ctx, "/v2/album/feed/search/query", params, nil)
 		if err != nil {
 			return nil, err
 		}

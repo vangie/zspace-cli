@@ -211,6 +211,15 @@ func str(args map[string]any, key string) string {
 	return v
 }
 
+func intPtr(args map[string]any, key string) *int {
+	v, ok := args[key]
+	if !ok || v == nil {
+		return nil
+	}
+	n := numArg(args, key, 0)
+	return &n
+}
+
 func schema(required []string, props map[string]any) map[string]any {
 	return map[string]any{
 		"type": "object", "properties": props, "required": required, "additionalProperties": false,
@@ -246,6 +255,11 @@ func toolsFor(write, allowDelete bool) []tool {
 			schema([]string{"keyword"}, map[string]any{"keyword": textProp("关键词")}),
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
 				return c.Search(ctx, str(a, "keyword"))
+			}},
+		{"glob", "按绝对路径通配符列出文件。单层 * 不进子目录，** 才递归", "read",
+			schema([]string{"pattern"}, map[string]any{"pattern": textProp("NAS 绝对路径通配符，例如 /sata1/my/data/*.mkv")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.Glob(ctx, str(a, "pattern"))
 			}},
 		{"pools", "存储池信息", "read", schema(nil, map[string]any{}),
 			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.PoolInfo(ctx) }},
@@ -292,6 +306,60 @@ func toolsFor(write, allowDelete bool) []tool {
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
 				return c.CloudStatus(ctx, api.CloudProvider(str(a, "provider")))
 			}},
+		{"cloud_info", "已登录网盘的账号信息", "read",
+			schema([]string{"provider"}, map[string]any{"provider": textProp("baidu 或 quark")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.CloudUserInfo(ctx, api.CloudProvider(str(a, "provider")))
+			}},
+		{"cloud_ls", "列出网盘目录。百度用 path，夸克用 parent_file_id", "read",
+			schema([]string{"provider"}, map[string]any{
+				"provider":       textProp("baidu 或 quark"),
+				"path":           textProp("百度目录，默认 /"),
+				"parent_file_id": textProp("夸克目录 ID，根目录为 0"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				dir := str(a, "path")
+				if dir == "" {
+					dir = "/"
+				}
+				return c.CloudList(ctx, api.CloudProvider(str(a, "provider")), dir, str(a, "parent_file_id"), 1, 100)
+			}},
+		{"cloud_tasks", "网盘传输任务", "read",
+			schema([]string{"provider"}, map[string]any{"provider": textProp("baidu 或 quark")}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.CloudTasks(ctx, api.CloudProvider(str(a, "provider")))
+			}},
+		{"cloud_fails", "网盘传输失败明细", "read",
+			schema([]string{"provider"}, map[string]any{
+				"provider": textProp("baidu 或 quark"),
+				"task_id":  textProp("可选，限定某一个任务"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.CloudFails(ctx, api.CloudProvider(str(a, "provider")), str(a, "task_id"))
+			}},
+		{"cloud_share_verify", "校验百度分享链接，返回 spwd", "read",
+			schema([]string{"short_url"}, map[string]any{
+				"short_url": textProp("分享短链"),
+				"pwd":       textProp("提取码，没有就留空"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				spwd, err := c.CloudShareVerify(ctx, str(a, "short_url"), str(a, "pwd"))
+				if err != nil {
+					return nil, err
+				}
+				return map[string]string{"spwd": spwd}, nil
+			}},
+		{"cloud_share_ls", "列出百度分享里的文件", "read",
+			schema([]string{"short_url", "spwd"}, map[string]any{
+				"short_url": textProp("分享短链"),
+				"spwd":      textProp("share_verify 返回的 spwd"),
+				"path":      textProp("分享内路径，默认 /"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				return c.CloudShareList(ctx, str(a, "short_url"), str(a, "spwd"), str(a, "path"))
+			}},
+		{"recycle_config", "回收站保留天数", "read", schema(nil, map[string]any{}),
+			func(ctx context.Context, c *api.Client, _ map[string]any) (any, error) { return c.RecycleConfig(ctx) }},
 
 		{"rename", "重命名 NAS 文件", "write",
 			schema([]string{"path", "new_name"}, map[string]any{"path": textProp("原路径"), "new_name": textProp("新文件名")}),
@@ -321,6 +389,43 @@ func toolsFor(write, allowDelete bool) []tool {
 			}),
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
 				return c.Upload(ctx, str(a, "local_path"), str(a, "remote_dir"), "")
+			}},
+		{"recycle_config_set", "设置回收站保留天数。-1 表示永不自动清除。未给出的字段保持当前值", "write",
+			schema(nil, map[string]any{
+				"my_days":     map[string]any{"type": "number", "description": "个人回收站保留天数，-1 为永不清除"},
+				"public_days": map[string]any{"type": "number", "description": "公共回收站保留天数，-1 为永不清除"},
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				my, public := intPtr(a, "my_days"), intPtr(a, "public_days")
+				if my == nil && public == nil {
+					return nil, errors.New("需要 my_days 或 public_days")
+				}
+				return c.RecycleSetConfig(ctx, my, public)
+			}},
+		{"cloud_task", "暂停、继续或清理网盘传输任务", "write",
+			schema([]string{"provider", "method"}, map[string]any{
+				"provider": textProp("baidu 或 quark"),
+				"method":   textProp("resume、pause、clean，或带 all 的批量操作"),
+				"task_id":  textProp("单任务操作必填"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				if err := c.CloudTaskAction(ctx, api.CloudProvider(str(a, "provider")), str(a, "method"), str(a, "task_id")); err != nil {
+					return nil, err
+				}
+				return map[string]any{"ok": true}, nil
+			}},
+		{"cloud_down", "把网盘文件下载到 NAS 目录", "write",
+			schema([]string{"provider", "save_path"}, map[string]any{
+				"provider":   textProp("baidu 或 quark"),
+				"save_path":  textProp("NAS 目录"),
+				"file_ids":   textProp("文件 ID，逗号分隔"),
+				"folder_ids": textProp("夸克文件夹 ID，逗号分隔"),
+			}),
+			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
+				if str(a, "file_ids") == "" && str(a, "folder_ids") == "" {
+					return nil, errors.New("需要 file_ids 或 folder_ids")
+				}
+				return c.CloudDownload(ctx, api.CloudProvider(str(a, "provider")), str(a, "save_path"), str(a, "file_ids"), str(a, "folder_ids"))
 			}},
 		{"docker_op", "对容器执行 start/stop/restart/pause/resume", "write",
 			schema([]string{"container_id", "action"}, map[string]any{

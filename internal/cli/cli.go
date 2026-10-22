@@ -51,6 +51,11 @@ func Run(args []string) int {
 	pickType := fs.Int("type-id", 0, "")
 	mode := fs.String("mode", "ai", "")
 	thumbSize := fs.String("size", "small", "")
+	myDays := fs.Int("my-days", -999, "")
+	publicDays := fs.Int("public-days", -999, "")
+	fileIDs := fs.String("file-ids", "", "")
+	folderIDs := fs.String("folder-ids", "", "")
+	taskID := fs.String("task", "", "")
 	status := fs.String("status", "all", "")
 	kind := fs.String("type", "loading", "")
 	parentID := fs.String("parent-id", "0", "")
@@ -67,6 +72,8 @@ func Run(args []string) int {
 		json: *jsonOut, yes: *yes, configDir: *configDir, baseURL: *baseURL,
 		hidden: *hidden, public: *public, force: *force, start: *start,
 		liked: *liked, unlike: *unlike, thumbSize: *thumbSize,
+		myDays: *myDays, publicDays: *publicDays,
+		fileIDs: *fileIDs, folderIDs: *folderIDs, taskID: *taskID,
 		page: *page, limit: *limit, startAt: *startAt, pickType: *pickType,
 		mode: *mode, status: *status, kind: *kind, parentID: *parentID,
 	})
@@ -94,6 +101,8 @@ type opts struct {
 	json, yes, hidden, public, force, start bool
 	liked, unlike                           bool
 	thumbSize                               string
+	myDays, publicDays                      int
+	fileIDs, folderIDs, taskID              string
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
 	page, limit, startAt, pickType          int
@@ -127,6 +136,11 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 			return nil, 2, err
 		}
 		return call(c.Info(ctx, args[0]))
+	case "glob":
+		if err := need(1); err != nil {
+			return nil, 2, err
+		}
+		return call(c.Glob(ctx, args[0]))
 	case "find":
 		if err := need(1); err != nil {
 			return nil, 2, err
@@ -172,7 +186,11 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 		if err := confirm(o, "移动到 "+args[len(args)-1]); err != nil {
 			return nil, 2, err
 		}
-		env, err := c.Move(ctx, args[:len(args)-1], args[len(args)-1])
+		paths, err := expandAll(ctx, c, args[:len(args)-1])
+		if err != nil {
+			return nil, 1, err
+		}
+		env, err := c.Move(ctx, paths, args[len(args)-1])
 		return env.Data, 0, err
 	case "cp":
 		if err := need(2); err != nil {
@@ -181,16 +199,24 @@ func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int,
 		if err := confirm(o, "复制到 "+args[len(args)-1]); err != nil {
 			return nil, 2, err
 		}
-		env, err := c.Copy(ctx, args[:len(args)-1], args[len(args)-1])
+		paths, err := expandAll(ctx, c, args[:len(args)-1])
+		if err != nil {
+			return nil, 1, err
+		}
+		env, err := c.Copy(ctx, paths, args[len(args)-1])
 		return env.Data, 0, err
 	case "rm":
 		if err := need(1); err != nil {
 			return nil, 2, err
 		}
-		if err := confirm(o, "删除 "+strings.Join(args, " ")+"（进入个人回收站）"); err != nil {
+		if err := confirm(o, "删除（进入个人回收站）"); err != nil {
 			return nil, 2, err
 		}
-		env, err := c.Remove(ctx, args)
+		paths, err := expandAll(ctx, c, args)
+		if err != nil {
+			return nil, 1, err
+		}
+		env, err := c.Remove(ctx, paths)
 		return env.Data, 0, err
 	case "up":
 		if err := need(2); err != nil {
@@ -299,6 +325,19 @@ func parseInterspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 		i++
 	}
 	return rest, nil
+}
+
+// expandAll 把每个参数里的通配符展开成 NAS 路径。
+func expandAll(ctx context.Context, c *api.Client, args []string) ([]string, error) {
+	var out []string
+	for _, a := range args {
+		paths, err := c.Expand(ctx, a)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, paths...)
+	}
+	return out, nil
 }
 
 // call 把两返回值的 API 调用收成 dispatch 需要的三返回值。
@@ -420,6 +459,21 @@ func cmdRecycle(ctx context.Context, c *api.Client, args []string, o opts) (any,
 		return map[string]any{"restored": len(args) - len(failed), "failed": failed}, 0, nil
 	case "config":
 		return call(c.RecycleConfig(ctx))
+	case "config-set":
+		if o.myDays == -999 && o.publicDays == -999 {
+			return nil, 2, errors.New("用法：zspace recycle config-set --yes --my-days <天> --public-days <天>")
+		}
+		if err := confirm(o, "修改回收站保留天数"); err != nil {
+			return nil, 2, err
+		}
+		var my, public *int
+		if o.myDays != -999 {
+			my = &o.myDays
+		}
+		if o.publicDays != -999 {
+			public = &o.publicDays
+		}
+		return call(c.RecycleSetConfig(ctx, my, public))
 	default:
 		return nil, 2, fmt.Errorf("未知子命令 recycle %s", sub)
 	}
@@ -427,12 +481,14 @@ func cmdRecycle(ctx context.Context, c *api.Client, args []string, o opts) (any,
 
 func cmdCloud(ctx context.Context, c *api.Client, args []string, o opts) (any, int, error) {
 	if len(args) < 2 {
-		return nil, 2, errors.New("用法：zspace cloud <status|ls|tasks> <baidu|quark>")
+		return nil, 2, errors.New("用法：zspace cloud <status|info|ls|tasks|fails|task|down|share-verify|share-ls> <baidu|quark>")
 	}
 	p := api.CloudProvider(args[1])
 	switch args[0] {
 	case "status":
 		return call(c.CloudStatus(ctx, p))
+	case "info":
+		return call(c.CloudUserInfo(ctx, p))
 	case "ls":
 		dir := "/"
 		if len(args) > 2 {
@@ -441,6 +497,56 @@ func cmdCloud(ctx context.Context, c *api.Client, args []string, o opts) (any, i
 		return call(c.CloudList(ctx, p, dir, o.parentID, o.page, o.limit))
 	case "tasks":
 		return call(c.CloudTasks(ctx, p))
+	case "fails":
+		return call(c.CloudFails(ctx, p, o.taskID))
+	case "task":
+		if len(args) < 3 {
+			return nil, 2, errors.New("用法：zspace cloud task <baidu|quark> <操作> [任务ID] --yes")
+		}
+		task := ""
+		if len(args) > 3 {
+			task = args[3]
+		}
+		if err := confirm(o, "网盘任务操作 "+args[2]); err != nil {
+			return nil, 2, err
+		}
+		if err := c.CloudTaskAction(ctx, p, args[2], task); err != nil {
+			return nil, 1, err
+		}
+		return map[string]any{"provider": string(p), "method": args[2], "ok": true}, 0, nil
+	case "down":
+		if len(args) < 3 {
+			return nil, 2, errors.New("用法：zspace cloud down <baidu|quark> <NAS目录> --file-ids a,b --yes")
+		}
+		if o.fileIDs == "" && o.folderIDs == "" {
+			return nil, 2, errors.New("需要 --file-ids 或 --folder-ids")
+		}
+		if err := confirm(o, "把网盘文件下载到 "+args[2]); err != nil {
+			return nil, 2, err
+		}
+		return call(c.CloudDownload(ctx, p, args[2], o.fileIDs, o.folderIDs))
+	case "share-verify":
+		if p != api.CloudBaidu || len(args) < 3 {
+			return nil, 2, errors.New("用法：zspace cloud share-verify baidu <短链> [提取码]")
+		}
+		pwd := ""
+		if len(args) > 3 {
+			pwd = args[3]
+		}
+		spwd, err := c.CloudShareVerify(ctx, args[2], pwd)
+		if err != nil {
+			return nil, 1, err
+		}
+		return map[string]string{"spwd": spwd}, 0, nil
+	case "share-ls":
+		if p != api.CloudBaidu || len(args) < 4 {
+			return nil, 2, errors.New("用法：zspace cloud share-ls baidu <短链> <spwd> [路径]")
+		}
+		dir := "/"
+		if len(args) > 4 {
+			dir = args[4]
+		}
+		return call(c.CloudShareList(ctx, args[2], args[3], dir))
 	default:
 		return nil, 2, fmt.Errorf("未知子命令 cloud %s", args[0])
 	}
@@ -565,7 +671,7 @@ func cmdPhoto(ctx context.Context, c *api.Client, args []string, o opts) (any, i
 
 func printHuman(cmd string, out any) {
 	switch cmd {
-	case "ls", "find":
+	case "ls", "find", "glob":
 		entries, ok := out.([]api.FileEntry)
 		if !ok {
 			printJSON(out)
@@ -616,12 +722,13 @@ const usage = `zspace — 极空间 NAS 命令行
   ls [路径]                    列出目录（--hidden 显示隐藏文件）
   info <路径>                  文件或目录详情
   find <关键词> [路径前缀]     全文搜索（--limit）
+  glob <绝对路径通配符>        匹配 NAS 路径，支持 * ? [...] **
   tree [路径]                  目录树（--limit 作深度，默认 2）
   rename <路径> <新名字>       重命名（--yes）
   mkdir <父目录> <名字>        新建目录（--yes）
-  mv <路径>... <目标目录>      移动（--yes）
-  cp <路径>... <目标目录>      复制（--yes）
-  rm <路径>...                 移入个人回收站（--yes）
+  mv <路径或通配符>... <目标目录>  移动（--yes）
+  cp <路径或通配符>... <目标目录>  复制（--yes）
+  rm <路径或通配符>...             移入个人回收站（--yes）
   up <本地文件> <NAS目录>      上传（--yes）
   down <NAS路径> [本地路径]    下载
 
@@ -636,12 +743,23 @@ const usage = `zspace — 极空间 NAS 命令行
   recycle list [路径]          默认个人回收站 /.recycle/my
   recycle empty --yes          清空（--public 清公共回收站）
   recycle restore <路径> --yes 从回收站还原
-  recycle config               保留天数
+  recycle config               查看保留天数
+  recycle config-set --yes     设置保留天数（--my-days --public-days，-1 为永不清除）
 
 网盘、下载、相册
-  cloud status <baidu|quark>
+  cloud status <baidu|quark>      是否已登录
+  cloud info <baidu|quark>        账号信息
   cloud ls <baidu|quark> [路径]    --page --limit --parent-id
-  cloud tasks <baidu|quark>
+  cloud tasks <baidu|quark>       传输任务
+  cloud fails <baidu|quark>       失败明细（--task 限定一个任务）
+  cloud task <baidu|quark> <操作> [任务ID] --yes
+                                  操作：resume pause clean，以及 pause_all
+                                  resume_all clean_all clean_all_done
+                                  resume_fail_all clean_fail_all
+  cloud down <baidu|quark> <NAS目录> --yes
+                                  --file-ids，夸克还可 --folder-ids
+  cloud share-verify baidu <短链> [提取码]  分享校验，返回 spwd
+  cloud share-ls baidu <短链> <spwd> [路径] 列出分享内容
   download list                    --type loading|complete --status all
   download add <链接> <目录> --yes
   photo status                     相册开关和 AI 索引进度

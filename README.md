@@ -43,12 +43,13 @@ Linux 依次查找 `~/.zspace`、`~/.config/zspace`、`~/zspace`。
 
 | 命令 | 作用 |
 | --- | --- |
-| `ls` `info` `find` `tree` | 列目录、详情、全文搜索、目录树 |
+| `ls` `info` `find` `glob` `tree` | 列目录、详情、全文搜索、通配符、目录树 |
 | `rename` `mkdir` `mv` `cp` `rm` | 重命名、新建、移动、复制、删除 |
 | `up` `down` | 上传、下载。大文件按桌面客户端的分片协议上传 |
 | `pools` `disks` `usage` `hardware` `smart` | 存储池、磁盘、用量、硬件、SMART。存储池未就绪时 `pools` 返回业务码 `N300477`，此时用 `disks` 和 `usage` |
-| `recycle list\|empty\|restore\|config` | 回收站。`empty --public` 清公共回收站 |
-| `cloud status\|ls\|tasks <baidu\|quark>` | 百度网盘、夸克网盘 |
+| `recycle list\|empty\|restore\|config\|config-set` | 回收站。`config-set --my-days` 改保留天数，`-1` 为永不清除 |
+| `cloud status\|info\|ls\|tasks\|fails` | 百度网盘、夸克网盘的状态、账号、目录、任务、失败明细 |
+| `cloud down\|task\|share-verify\|share-ls` | 下载到 NAS、暂停/继续/清理任务、百度分享链接 |
 | `download list\|add` | NAS 下载器 |
 | `photo status\|home\|albums\|info\|feeds\|timeline\|list\|dirs` | 相册首页、列表、详情、照片流、时间线、扫描目录 |
 | `photo picks\|pick` | AI 挑选分类和结果 |
@@ -89,7 +90,7 @@ zspace docker op remove <容器ID> --yes
 }
 ```
 
-工具名以 `zspace_` 开头，例如 `zspace_ls`、`zspace_docker_ps`、`zspace_find`。
+工具名以 `zspace_` 开头，例如 `zspace_ls`、`zspace_glob`、`zspace_docker_ps`、`zspace_cloud_ls`、`zspace_photo_home`。`--write` 另外打开回收站天数、网盘任务和网盘下载。
 
 ## 接口从哪里来
 

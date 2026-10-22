@@ -37,4 +37,16 @@ func TestInitializeAndToolGating(t *testing.T) {
 	if !strings.Contains(string(buf), "zspace_docker_ps") || strings.Contains(string(buf), "zspace_remove") {
 		t.Fatalf("tools/list 未按开关过滤：%s", buf)
 	}
+	if !strings.Contains(string(buf), "zspace_glob") || !strings.Contains(string(buf), "zspace_cloud_fails") || !strings.Contains(string(buf), "zspace_recycle_config") {
+		t.Fatalf("读工具缺少新增项：%s", buf)
+	}
+	if strings.Contains(string(buf), "zspace_cloud_down") || strings.Contains(string(buf), "zspace_recycle_config_set") {
+		t.Fatalf("默认不应暴露写工具：%s", buf)
+	}
+	wbuf, _ := json.Marshal(handle(request{
+		JSONRPC: "2.0", ID: json.RawMessage(`3`), Method: "tools/list",
+	}, write, "", "").Result)
+	if !strings.Contains(string(wbuf), "zspace_cloud_down") || !strings.Contains(string(wbuf), "zspace_recycle_config_set") {
+		t.Fatalf("写开关未打开新工具：%s", wbuf)
+	}
 }
