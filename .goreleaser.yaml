@@ -1,0 +1,63 @@
+version: 2
+
+project_name: zspace-cli
+
+builds:
+  - id: zspace
+    main: ./cmd/zspace
+    binary: zspace
+    ldflags:
+      - -s -w -X github.com/vangie/zspace-cli/internal/cli.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+  - id: zspace-mcp
+    main: ./cmd/zspace-mcp
+    binary: zspace-mcp
+    ldflags:
+      - -s -w -X github.com/vangie/zspace-cli/internal/mcp.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - id: zspace
+    builds: [zspace]
+    name_template: "zspace_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+  - id: zspace-mcp
+    builds: [zspace-mcp]
+    name_template: "zspace-mcp_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+
+brews:
+  - name: zspace-cli
+    repository:
+      owner: vangie
+      name: homebrew-tap
+    directory: Formula
+    homepage: https://github.com/vangie/zspace-cli
+    description: 极空间 NAS 的命令行与 MCP 服务
+    install: |
+      bin.install "zspace"
+      bin.install "zspace-mcp"
+    test: |
+      system "#{bin}/zspace version"
