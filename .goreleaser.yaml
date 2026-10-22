@@ -51,6 +51,7 @@ brews:
       git:
         url: git@github.com:vangie/homebrew-tap.git
         private_key: '{{ .Env.HOMEBREW_TAP_DEPLOY_KEY }}'
+    directory: Formula
     homepage: https://github.com/vangie/zspace-cli
     description: 极空间 NAS 的命令行与 MCP 服务
     install: |
