@@ -34,14 +34,11 @@ jobs:
             index($0, "## [" tag "]") == 1 { found=1; next }
             found && index($0, "## [") == 1 { exit }
             found { print }
-          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
-          if ! grep -q . "$RUNNER_TEMP/release-notes.md"; then
+          ' CHANGELOG.md > .release-notes.md
+          if ! grep -q . .release-notes.md; then
             echo "CHANGELOG.md 里没有 [$tag] 这一节，发布中止" >&2
             exit 1
           fi
-          echo "RELEASE_NOTES<<EOF" >> "$GITHUB_ENV"
-          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
-          echo "EOF" >> "$GITHUB_ENV"
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
