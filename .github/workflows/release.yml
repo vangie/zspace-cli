@@ -31,18 +31,21 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME#v}"
           awk -v tag="$tag" '
-            $0 ~ "^## \\[" tag "\\]" { found=1; print; next }
-            $0 ~ "^## \\[" && found { exit }
+            $0 == "## [" tag "]" { found=1; next }
+            $0 ~ /^## \[/ && found { exit }
             found { print }
           ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           if ! grep -q . "$RUNNER_TEMP/release-notes.md"; then
             echo "CHANGELOG.md 里没有 [$tag] 这一节，发布中止" >&2
             exit 1
           fi
+          echo "RELEASE_NOTES<<EOF" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # GITHUB_TOKEN 不能写 homebrew-tap。用只写该仓库的 deploy key。
