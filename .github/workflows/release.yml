@@ -31,8 +31,8 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME#v}"
           awk -v tag="$tag" '
-            $0 == "## [" tag "]" { found=1; next }
-            $0 ~ /^## \[/ && found { exit }
+            index($0, "## [" tag "]") == 1 { found=1; next }
+            found && index($0, "## [") == 1 { exit }
             found { print }
           ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
           if ! grep -q . "$RUNNER_TEMP/release-notes.md"; then
