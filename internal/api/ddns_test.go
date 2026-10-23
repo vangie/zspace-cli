@@ -88,6 +88,35 @@ func TestDDNSUpdateKeepsExistingKey(t *testing.T) {
 	}
 }
 
+func TestCloudflareCreateAllowsEmptyZoneID(t *testing.T) {
+	var body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		_, _ = w.Write([]byte(`{"code":"200","data":{}}`))
+	}))
+	defer srv.Close()
+	c := &Client{BaseURL: srv.URL, Creds: Credentials{Token: "T", NasID: "N", DeviceID: "D"}, HTTP: srv.Client()}
+	err := c.DDNSCreate(context.Background(), DDNSRecord{
+		Provider: DDNSCloudflare, Record4: []string{"nas.example.com"}, AccessKey: "cf-token", IPv4Enable: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(body, `"access_id"`) {
+		t.Fatalf("Cloudflare 未填 ZONE ID 时不应提交 access_id：%s", body)
+	}
+	if !strings.Contains(body, `"access_key":"cf-token"`) {
+		t.Fatalf("应提交 API Token：%s", body)
+	}
+	err = c.DDNSCreate(context.Background(), DDNSRecord{
+		Provider: DDNSAliyun, Record4: []string{"nas.example.com"}, AccessKey: "secret", IPv4Enable: true,
+	})
+	if err == nil {
+		t.Fatal("阿里云缺少 access_id 应被拒绝")
+	}
+}
+
 func mustJSON(t *testing.T, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)

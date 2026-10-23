@@ -194,7 +194,9 @@ func prepareDDNS(rec DDNSRecord, creating bool) (map[string]any, error) {
 	if rec.AccessKey == "" {
 		return nil, fmt.Errorf("需要 access_key")
 	}
-	if rec.Provider != DDNSDuckDNS && rec.AccessID == "" {
+	// Cloudflare 页面上 access_id 是可选的 ZONE ID，access_key 是 API Token。
+	// 阿里云和腾讯云的 access_id 则是必填的密钥 ID。
+	if rec.Provider != DDNSDuckDNS && rec.Provider != DDNSCloudflare && rec.AccessID == "" {
 		return nil, fmt.Errorf("需要 access_id")
 	}
 	if rec.IPv4DetectMethod == "" {

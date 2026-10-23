@@ -511,8 +511,8 @@ func toolsFor(write, allowDelete bool) []tool {
 				"provider":   textProp("tencent、aliyun、cloudflare 或 duckdns"),
 				"record4":    textProp("IPv4 主机记录，逗号分隔"),
 				"record6":    textProp("IPv6 主机记录，逗号分隔"),
-				"access_id":  textProp("除 duckdns 外必填"),
-				"access_key": textProp("密钥或 token"),
+				"access_id":  textProp("阿里云和腾讯云必填；Cloudflare 为可选的 ZONE ID；duckdns 不填"),
+				"access_key": textProp("密钥或 token；Cloudflare 填 API Token"),
 			}),
 			func(ctx context.Context, c *api.Client, a map[string]any) (any, error) {
 				rec := api.DDNSRecord{

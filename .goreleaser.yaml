@@ -35,11 +35,7 @@ checksum:
   name_template: checksums.txt
 
 changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^chore:"
+  disable: true
 
 # 继续发 Formula，现有的 brew install vangie/tap/zspace-cli 不用改。
 # brews 在 2.18 已标记弃用，但 homebrew_casks 会改成 cask，和现在的安装方式不一致。

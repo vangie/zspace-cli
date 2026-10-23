@@ -142,11 +142,11 @@ type opts struct {
 	configDir, baseURL, mode, status, kind  string
 	parentID                                string
 	page, limit, startAt, pickType          int
-	httpProxy, httpsProxy               string
-	proxyOff                            bool
-	proxyUser, proxyPassword            string
-	publish, volumes, env               []string
-	network, restart                    string
+	httpProxy, httpsProxy                   string
+	proxyOff                                bool
+	proxyUser, proxyPassword                string
+	publish, volumes, env                   []string
+	network, restart                        string
 }
 
 func dispatch(ctx context.Context, cmd string, args []string, o opts) (any, int, error) {
@@ -906,6 +906,8 @@ DDNS
   ddns add --provider <tencent|aliyun|cloudflare|duckdns> --yes
                                   --record4 主机名，逗号分隔，可再加 --record6
                                   --access-id --access-key
+                                  Cloudflare 的 --access-key 是 API Token，
+                                  --access-id 是可选的 ZONE ID
                                   IP 检测默认极空间云端；网卡用
                                   --ipv4-method interface --ipv4-interface <网卡>
   ddns update --provider <服务商> --yes

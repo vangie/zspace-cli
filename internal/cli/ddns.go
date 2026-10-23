@@ -94,7 +94,7 @@ func ddnsFromFlags(o opts, creating bool) (api.DDNSRecord, error) {
 	if creating && rec.AccessKey == "" {
 		return api.DDNSRecord{}, errors.New("需要 --access-key")
 	}
-	if creating && rec.Provider != api.DDNSDuckDNS && rec.AccessID == "" {
+	if creating && rec.Provider != api.DDNSDuckDNS && rec.Provider != api.DDNSCloudflare && rec.AccessID == "" {
 		return api.DDNSRecord{}, errors.New("需要 --access-id")
 	}
 	return rec, nil
